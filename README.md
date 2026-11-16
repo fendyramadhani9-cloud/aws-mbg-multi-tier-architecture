@@ -4,6 +4,16 @@ Panduan langkah demi langkah untuk membangun arsitektur aplikasi web multi-tier 
 
 ---
 
+## Daftar Script Cepat
+
+| Komponen | File Script | Raw URL (Download / `curl`) |
+| :--- | :--- | :--- |
+| **EC2 Back End** | [`scripts/backend.sh`](scripts/backend.sh) | [Raw `backend.sh`](https://raw.githubusercontent.com/fendyramadhani9-cloud/aws-mbg-multi-tier-architecture/main/scripts/backend.sh) |
+| **EC2 Front End (Pre-Prod)** | [`scripts/frontend.sh`](scripts/frontend.sh) | [Raw `frontend.sh`](https://raw.githubusercontent.com/fendyramadhani9-cloud/aws-mbg-multi-tier-architecture/main/scripts/frontend.sh) |
+| **Launch Template User Data** | [`scripts/launch-template-userdata.sh`](scripts/launch-template-userdata.sh) | [Raw `launch-template-userdata.sh`](https://raw.githubusercontent.com/fendyramadhani9-cloud/aws-mbg-multi-tier-architecture/main/scripts/launch-template-userdata.sh) |
+
+---
+
 ## Persiapan Awal
 - Pastikan seluruh resource dibuat di Region **`us-east-1` (N. Virginia)**.
 - Catat **AWS Account ID** kamu di awal untuk penamaan S3 Bucket dan SNS Topic ARN.
@@ -129,82 +139,9 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
    - Security Group: `mbg-sg-be`
    - **Advanced details → IAM instance profile**: `LabInstanceProfile`
 
-2. Masukkan script berikut ke **User Data** (atau jalankan via SSM Session Manager), sesuaikan `RDS_HOST`, `S3_BUCKET`, dan `SNS_TOPIC_ARN`:
-
-```bash
-#!/bin/bash
-RDS_HOST="GANTI_DENGAN_ENDPOINT_RDS"
-DB_USER="admin"
-DB_PASS="12345678"
-DB_NAME="mbg_db"
-S3_BUCKET="mbg-uploads-GANTI_ACCOUNT_ID-us-east-1-an"
-SNS_TOPIC_ARN="arn:aws:sns:us-east-1:GANTI_ACCOUNT_ID:mbg-sns-notifikasi"
-AWS_REGION="us-east-1"
-
-set -e
-hostnamectl set-hostname mbg-ec2-be
-dnf update -y
-dnf install -y php php-cli php-mysqlnd php-xml php-mbstring php-curl php-zip unzip git httpd composer awscli
-systemctl start httpd
-systemctl enable httpd
-
-aws s3api put-object --bucket "${S3_BUCKET}" --key aduan/ --region "${AWS_REGION}" || true
-aws s3api put-object --bucket "${S3_BUCKET}" --key laporan/ --region "${AWS_REGION}" || true
-
-# Setup Swap 2GB agar composer tidak kehabisan RAM di t3.micro
-if [ ! -f /swapfile ]; then
-  dd if=/dev/zero of=/swapfile bs=128M count=16
-  chmod 600 /swapfile
-  mkswap /swapfile
-  swapon /swapfile
-  grep -q '/swapfile' /etc/fstab || echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
-fi
-
-cd /var/www/html
-rm -rf * .* 2>/dev/null || true
-git clone https://github.com/ukkce2627/mbg-app-be .
-
-export COMPOSER_ALLOW_SUPERUSER=1
-export COMPOSER_MEMORY_LIMIT=-1
-for i in {1..5}; do
-  php -d memory_limit=-1 /usr/bin/composer require aws/aws-sdk-php --no-interaction --prefer-dist && break || sleep 5
-done
-
-cat << EOF_CONFIG > /var/www/html/config.php
-<?php
-return [
-    'db' => [
-        'host' => '${RDS_HOST}',
-        'port' => '3306',
-        'user' => '${DB_USER}',
-        'pass' => '${DB_PASS}',
-        'name' => '${DB_NAME}',
-    ],
-    's3' => [
-        'bucket' => '${S3_BUCKET}',
-        'region' => '${AWS_REGION}',
-    ],
-    'sns' => [
-        'topic_arn' => '${SNS_TOPIC_ARN}',
-    ],
-    'api_key' => 'mbg-secret-key-2024',
-];
-EOF_CONFIG
-
-# Bersihkan fallback storage lokal
-rm -rf /var/www/html/public/storage/* 2>/dev/null || true
-touch /var/www/html/public/storage/.gitkeep
-chown -R apache:apache /var/www/html
-chmod -R 775 /var/www/html
-
-sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
-systemctl restart httpd
-
-# Auto-migration & seed akun awal
-for i in {1..30}; do
-  php /var/www/html/seed_users.php && break || sleep 5
-done
-```
+2. Buka script setup Back End: 👉 **[`scripts/backend.sh`](scripts/backend.sh)**
+   - Copy isinya ke **User Data** (atau jalankan via SSM Session Manager).
+   - Ganti variabel `RDS_HOST`, `S3_BUCKET`, dan `SNS_TOPIC_ARN` di bagian paling atas script.
 
 3. Catat **Private IP** dari `mbg-ec2-be` setelah instance berjalan.
 
@@ -217,80 +154,9 @@ done
    - Subnet: `mbg-subnet-private-fe-1a` | Auto-assign public IP: **Disable**
    - Security Group: `mbg-sg-fe` | IAM instance profile: `LabInstanceProfile`
 
-2. Masukkan script berikut ke **User Data** (ganti `EFS_ID` dan `BE_PRIVATE_IP`):
-
-```bash
-#!/bin/bash
-EFS_ID="GANTI_DENGAN_EFS_ID"
-BE_PRIVATE_IP="GANTI_DENGAN_PRIVATE_IP_BE"
-
-set -e
-hostnamectl set-hostname mbg-ec2-fe
-dnf update -y
-dnf install -y php php-cli php-mbstring php-curl git httpd amazon-efs-utils nfs-utils composer python3-botocore python3-boto3
-systemctl start httpd
-systemctl enable httpd
-
-# Mount EFS Shared Session
-mkdir -p /mnt/efs/mbg-session
-for i in {1..15}; do
-  mount -t efs -o tls ${EFS_ID}:/ /mnt/efs/mbg-session && break || sleep 5
-done
-if ! grep -q "/mnt/efs/mbg-session" /etc/fstab; then
-  echo "${EFS_ID}:/ /mnt/efs/mbg-session efs _netdev,tls 0 0" >> /etc/fstab
-fi
-chown -R apache:apache /mnt/efs/mbg-session
-chmod 777 /mnt/efs/mbg-session
-
-cd /var/www/html
-rm -rf * .* 2>/dev/null || true
-git clone https://github.com/ukkce2627/mbg-app-fe .
-
-cat << EOF_CONFIG > /var/www/html/config.php
-<?php
-return [
-    'api_base_url'      => 'http://${BE_PRIVATE_IP}/api',
-    'api_key'           => 'mbg-secret-key-2024',
-    'session_save_path' => '/mnt/efs/mbg-session',
-];
-EOF_CONFIG
-
-# Arahkan PHP session ke EFS
-sed -i 's|;session.save_path = "/tmp"|session.save_path = "/mnt/efs/mbg-session"|g' /etc/php.ini
-sed -i 's|session.save_path = "/var/lib/php/session"|session.save_path = "/mnt/efs/mbg-session"|g' /etc/php.ini
-echo 'session.save_path = "/mnt/efs/mbg-session"' > /etc/php.d/99-session.ini
-
-# Patch tautan 'Lihat lampiran' pada aduan.php
-python3 - << 'EOF_P1'
-p1 = '/var/www/html/views/sppg/aduan.php'
-with open(p1, 'r') as f:
-    c = f.read()
-if 'Lihat lampiran' not in c:
-    target = 'Klik foto untuk memperbesar.</div>'
-    replacement = 'Klik foto untuk memperbesar.</div>\n          <p><a class="btn btn-sm btn-outline-primary" href="<?= fe_e($a[\'file_url\']) ?>" target="_blank" rel="noopener">Lihat lampiran</a></p>'
-    c = c.replace(target, replacement)
-    with open(p1, 'w') as f:
-        f.write(c)
-EOF_P1
-
-# Patch status lowercase pada helpers.php
-python3 - << 'EOF_P2'
-p2 = '/var/www/html/includes/helpers.php'
-with open(p2, 'r') as f:
-    c2 = f.read()
-target2 = "fe_e(ucfirst($status)) . '</span>'"
-replacement2 = "fe_e(ucfirst($status)) . '</span> <span class=\"d-none\">' . strtolower($status) . '</span>'"
-if 'strtolower($status)' not in c2:
-    c2 = c2.replace(target2, replacement2)
-    with open(p2, 'w') as f:
-        f.write(c2)
-EOF_P2
-
-chown -R apache:apache /var/www/html
-chmod -R 755 /var/www/html
-sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
-systemctl restart httpd
-```
+2. Buka script setup Front End: 👉 **[`scripts/frontend.sh`](scripts/frontend.sh)**
+   - Copy isinya ke **User Data** (atau jalankan via SSM Session Manager).
+   - Ganti variabel `EFS_ID` dan `BE_PRIVATE_IP` di bagian paling atas script.
 
 3. Setelah `/health.php` merespons OK dan EFS ter-mount, buat **AMI** dari `mbg-ec2-fe-temp` bernama **`mbg-ami-fe`** (tunggu hingga status **Available**).
 
@@ -321,25 +187,7 @@ systemctl restart httpd
    - Security groups: `mbg-sg-fe`
    - **Resource tags**: Key = `Name`, Value = `mbg-ec2-fe` (Resource type: `Instances`)
    - **Advanced details → IAM instance profile**: `LabInstanceProfile`
-   - **Advanced details → User data** (ganti `EFS_ID`):
-
-```bash
-#!/bin/bash
-EFS_ID="GANTI_DENGAN_EFS_ID"
-
-hostnamectl set-hostname mbg-ec2-fe
-mkdir -p /mnt/efs/mbg-session
-for i in {1..10}; do
-  mount -t efs -o tls ${EFS_ID}:/ /mnt/efs/mbg-session && break || sleep 5
-done
-if ! grep -q "/mnt/efs/mbg-session" /etc/fstab; then
-  echo "${EFS_ID}:/ /mnt/efs/mbg-session efs _netdev,tls 0 0" >> /etc/fstab
-fi
-chown -R apache:apache /mnt/efs/mbg-session
-chmod 777 /mnt/efs/mbg-session
-systemctl start httpd
-systemctl enable httpd
-```
+   - **Advanced details → User data**: 👉 **[`scripts/launch-template-userdata.sh`](scripts/launch-template-userdata.sh)** *(ganti `EFS_ID` dengan File System ID kamu)*.
 
 2. **Auto Scaling Group (`mbg-asg-fe`)**:
    - Launch template: `mbg-lt-fe` (Version: **Default / Latest**)
