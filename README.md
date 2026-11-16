@@ -138,7 +138,7 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
 
 ## Langkah 7: EC2 Back End (`mbg-ec2-be`)
 
-1. Launch EC2 Instance:
+1. Launch EC2 Instance (tanpa User Data):
    - Name: `mbg-ec2-be`
    - AMI: **Amazon Linux 2023** | Instance type: `t3.micro`
    - VPC: `mbg-vpc` | Subnet: `mbg-subnet-private-be`
@@ -146,31 +146,62 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
    - Security Group: `mbg-sg-be`
    - **Advanced details → IAM instance profile**: `LabInstanceProfile`
 
-2. Buka script setup Back End: 👉 **[`scripts/backend.sh`](scripts/backend.sh)**
-   - Copy isinya ke **User Data** (atau jalankan via SSM Session Manager).
-   - Ganti 3 variabel di bagian paling atas script dengan milikmu:
-     - `RDS_HOST` → contoh: `"mbg-rds-mysql.c1fa8qkqs4ma.us-east-1.rds.amazonaws.com"`
-     - `S3_BUCKET` → contoh: `"mbg-uploads-937385515130-us-east-1-an"`
-     - `SNS_TOPIC_ARN` → contoh: `"arn:aws:sns:us-east-1:937385515130:mbg-sns-notifikasi"`
+2. Masuk ke instance lewat **Connect → Session Manager**, lalu masuk ke root:
+   ```bash
+   sudo su -
+   ```
 
-3. Catat **Private IP** dari `mbg-ec2-be` setelah instance berjalan (contoh: `10.20.10.134`).
+3. Buka script 👉 **[`scripts/backend.sh`](scripts/backend.sh)**, edit 3 variabel di bagian atas dengan milikmu (`RDS_HOST`, `S3_BUCKET`, `SNS_TOPIC_ARN`), lalu copy-paste dan jalankan di Session Manager:
+   ```bash
+   nano setup_be.sh
+   # (Paste isi scripts/backend.sh yang sudah diganti variabelnya, Ctrl+O -> Enter -> Ctrl+X)
+   bash setup_be.sh
+   ```
+
+4. Pastikan di akhir muncul blok konfirmasi seperti ini:
+   ```text
+   ================ HASIL SETUP BE ================
+   Hostname BE: mbg-ec2-be
+   Health Check BE: {"status":"ok","db":"connected","s3":{"status":"connected"},"sns":{"status":"connected"}}
+   AWS SDK Terpasang: YES (OK)
+   Fallback Storage: 0 (Harus 0)
+   ================================================
+   ```
+   Catat **Private IP** dari `mbg-ec2-be` (contoh: `10.20.10.134`).
 
 ---
 
 ## Langkah 8: EC2 Front End Sementara & Pembuatan AMI (`mbg-ami-fe`)
 
-1. Launch EC2 sementara (`mbg-ec2-fe-temp`):
+1. Launch EC2 sementara (`mbg-ec2-fe-temp`) tanpa User Data:
    - AMI: **Amazon Linux 2023** | Instance type: `t3.micro`
    - Subnet: `mbg-subnet-private-fe-1a` | Auto-assign public IP: **Disable**
    - Security Group: `mbg-sg-fe` | IAM instance profile: `LabInstanceProfile`
 
-2. Buka script setup Front End: 👉 **[`scripts/frontend.sh`](scripts/frontend.sh)**
-   - Copy isinya ke **User Data** (atau jalankan via SSM Session Manager).
-   - Ganti 2 variabel di bagian paling atas script dengan milikmu:
-     - `EFS_ID` → contoh: `"fs-03504232a17c81d42"`
-     - `BE_PRIVATE_IP` → contoh: `"10.20.10.134"`
+2. Masuk ke instance lewat **Connect → Session Manager**, lalu masuk ke root:
+   ```bash
+   sudo su -
+   ```
 
-3. Setelah `/health.php` merespons OK dan EFS ter-mount, buat **AMI** dari `mbg-ec2-fe-temp` bernama **`mbg-ami-fe`** (tunggu hingga status **Available**).
+3. Buka script 👉 **[`scripts/frontend.sh`](scripts/frontend.sh)**, edit 2 variabel di bagian atas dengan milikmu (`EFS_ID`, `BE_PRIVATE_IP`), lalu copy-paste dan jalankan di Session Manager:
+   ```bash
+   nano setup_fe.sh
+   # (Paste isi scripts/frontend.sh yang sudah diganti variabelnya, Ctrl+O -> Enter -> Ctrl+X)
+   bash setup_fe.sh
+   ```
+
+4. Pastikan di akhir muncul blok konfirmasi seperti ini:
+   ```text
+   ================ HASIL SETUP FE ================
+   Hostname FE: mbg-ec2-fe
+   Mount EFS: /mnt/efs/mbg-session nfs4
+   PHP Session Path: /mnt/efs/mbg-session
+   Health Check FE (/health.php): HTTP 200
+   Koneksi FE -> BE: {"status":"ok",...}
+   ================================================
+   ```
+
+5. Buat **AMI** dari `mbg-ec2-fe-temp` bernama **`mbg-ami-fe`** (tunggu hingga status **Available**).
 
 ---
 
@@ -199,7 +230,7 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
    - Security groups: `mbg-sg-fe`
    - **Resource tags**: Key = `Name`, Value = `mbg-ec2-fe` (Resource type: `Instances`)
    - **Advanced details → IAM instance profile**: `LabInstanceProfile`
-   - **Advanced details → User data**: 👉 **[`scripts/launch-template-userdata.sh`](scripts/launch-template-userdata.sh)** *(ganti `EFS_ID` contoh `"fs-03504232a17c81d42"` dengan File System ID milikmu)*.
+   - **Advanced details → User data**: Copy isi 👉 **[`scripts/launch-template-userdata.sh`](scripts/launch-template-userdata.sh)** *(ganti `EFS_ID` contoh `"fs-03504232a17c81d42"` dengan File System ID milikmu)*.
 
 2. **Auto Scaling Group (`mbg-asg-fe`)**:
    - Launch template: `mbg-lt-fe` (Version: **Default / Latest**)

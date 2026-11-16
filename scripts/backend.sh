@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# SCRIPT SETUP BACK END (mbg-ec2-be)
+# SCRIPT SETUP BACK END (mbg-ec2-be) - JALANKAN VIA SSM SESSION MANAGER
 # ==============================================================================
 # CONTOH FORMAT VARIABEL (Ganti sesuai Endpoint RDS & Account ID milikmu):
 RDS_HOST="mbg-rds-mysql.c1fa8qkqs4ma.us-east-1.rds.amazonaws.com"        # <-- Ganti dengan Endpoint RDS milikmu
@@ -83,4 +83,15 @@ for i in {1..30}; do
   php /var/www/html/seed_users.php && break || sleep 5
 done
 
-echo "=== SELESAI SETUP BACK END! ==="
+echo ""
+echo "================ HASIL SETUP BE ================"
+echo "Hostname BE: $(hostname)"
+echo "Health Check BE: $(curl -s http://localhost/api/health)"
+if [ -d /var/www/html/vendor/aws/aws-sdk-php ]; then
+  echo "AWS SDK Terpasang: YES (OK)"
+else
+  echo "AWS SDK Terpasang: NO (ERROR)"
+fi
+FB_COUNT=$(find /var/www/html/public/storage -type f ! -name '.gitkeep' 2>/dev/null | wc -l)
+echo "Fallback Storage: ${FB_COUNT} (Harus 0)"
+echo "================================================"

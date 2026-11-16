@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# SCRIPT SETUP FRONT END (mbg-ec2-fe-temp / Pre-Prod AMI)
+# SCRIPT SETUP FRONT END (mbg-ec2-fe-temp) - JALANKAN VIA SSM SESSION MANAGER
 # ==============================================================================
 # CONTOH FORMAT VARIABEL (Ganti sesuai EFS ID & Private IP Back End milikmu):
 EFS_ID="fs-03504232a17c81d42"     # <-- Ganti dengan File System ID EFS milikmu
@@ -83,4 +83,11 @@ chmod -R 755 /var/www/html
 sed -i '/<Directory "\/var\/www\/html">/,/<\/Directory>/ s/AllowOverride None/AllowOverride All/' /etc/httpd/conf/httpd.conf
 systemctl restart httpd
 
-echo "=== SELESAI SETUP FRONT END! ==="
+echo ""
+echo "================ HASIL SETUP FE ================"
+echo "Hostname FE: $(hostname)"
+echo "Mount EFS: $(mount | grep /mnt/efs/mbg-session | awk '{print $3, $5}' || echo 'NOT MOUNTED')"
+echo "PHP Session Path: $(php -r 'echo ini_get("session.save_path");')"
+echo "Health Check FE (/health.php): HTTP $(curl -s -o /dev/null -w '%{http_code}' http://localhost/health.php)"
+echo "Koneksi FE -> BE: $(curl -s http://${BE_PRIVATE_IP}/api/health)"
+echo "================================================"
