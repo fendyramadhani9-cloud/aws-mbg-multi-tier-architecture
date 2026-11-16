@@ -2,8 +2,8 @@
 # ==============================================================================
 # USER DATA LAUNCH TEMPLATE (mbg-lt-fe)
 # ==============================================================================
-# GANTI EFS_ID DENGAN FILE SYSTEM ID KAMU:
-EFS_ID="GANTI_DENGAN_EFS_ID"
+# CONTOH FORMAT VARIABEL (Ganti sesuai File System ID EFS milikmu):
+EFS_ID="fs-03504232a17c81d42"     # <-- Ganti dengan File System ID EFS milikmu
 # ==============================================================================
 
 hostnamectl set-hostname mbg-ec2-fe

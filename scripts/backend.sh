@@ -2,13 +2,13 @@
 # ==============================================================================
 # SCRIPT SETUP BACK END (mbg-ec2-be)
 # ==============================================================================
-# GANTI VARIABEL BERIKUT SESUAI AKUN & INFRASTRUKTUR KAMU:
-RDS_HOST="GANTI_DENGAN_ENDPOINT_RDS"
+# CONTOH FORMAT VARIABEL (Ganti sesuai Endpoint RDS & Account ID milikmu):
+RDS_HOST="mbg-rds-mysql.c1fa8qkqs4ma.us-east-1.rds.amazonaws.com"        # <-- Ganti dengan Endpoint RDS milikmu
 DB_USER="admin"
 DB_PASS="12345678"
 DB_NAME="mbg_db"
-S3_BUCKET="mbg-uploads-GANTI_ACCOUNT_ID-us-east-1-an"
-SNS_TOPIC_ARN="arn:aws:sns:us-east-1:GANTI_ACCOUNT_ID:mbg-sns-notifikasi"
+S3_BUCKET="mbg-uploads-937385515130-us-east-1-an"                        # <-- Ganti 937385515130 dengan Account ID milikmu
+SNS_TOPIC_ARN="arn:aws:sns:us-east-1:937385515130:mbg-sns-notifikasi"    # <-- Ganti 937385515130 dengan Account ID milikmu
 AWS_REGION="us-east-1"
 # ==============================================================================
 

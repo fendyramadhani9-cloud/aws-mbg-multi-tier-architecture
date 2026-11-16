@@ -2,9 +2,9 @@
 # ==============================================================================
 # SCRIPT SETUP FRONT END (mbg-ec2-fe-temp / Pre-Prod AMI)
 # ==============================================================================
-# GANTI VARIABEL BERIKUT SESUAI AKUN & INFRASTRUKTUR KAMU:
-EFS_ID="GANTI_DENGAN_EFS_ID"
-BE_PRIVATE_IP="GANTI_DENGAN_PRIVATE_IP_BE"
+# CONTOH FORMAT VARIABEL (Ganti sesuai EFS ID & Private IP Back End milikmu):
+EFS_ID="fs-03504232a17c81d42"     # <-- Ganti dengan File System ID EFS milikmu
+BE_PRIVATE_IP="10.20.10.134"      # <-- Ganti dengan Private IP EC2 Back End (mbg-ec2-be) milikmu
 # ==============================================================================
 
 set -e
