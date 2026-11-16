@@ -14,9 +14,15 @@ Panduan langkah demi langkah untuk membangun arsitektur aplikasi web multi-tier 
 
 ---
 
-## Persiapan Awal
+## Persiapan Awal & Contoh Format Resource yang Dicatat
 - Pastikan seluruh resource dibuat di Region **`us-east-1` (N. Virginia)**.
-- Catat **AWS Account ID** kamu di awal untuk penamaan S3 Bucket dan SNS Topic ARN.
+- Selama proses pembuatan, catat nilai-nilai berikut (contoh format asli agar mudah dikenali):
+  - **AWS Account ID**: contoh `937385515130`
+  - **RDS Endpoint**: contoh `mbg-rds-mysql.c1fa8qkqs4ma.us-east-1.rds.amazonaws.com`
+  - **S3 Bucket Name**: contoh `mbg-uploads-937385515130-us-east-1-an`
+  - **SNS Topic ARN**: contoh `arn:aws:sns:us-east-1:937385515130:mbg-sns-notifikasi`
+  - **EFS File System ID**: contoh `fs-03504232a17c81d42`
+  - **Private IP EC2 Back End**: contoh `10.20.10.134`
 
 ---
 
@@ -98,14 +104,14 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
    - VPC security group: `mbg-sg-rds`
    - **Additional configuration → Initial database name**: `mbg_db`
 
-3. Tunggu sampai status **Available**, lalu catat **Endpoint RDS**.
+3. Tunggu sampai status **Available**, lalu catat **Endpoint RDS** (contoh: `mbg-rds-mysql.c1fa8qkqs4ma.us-east-1.rds.amazonaws.com`, port `3306`).
 
 ---
 
 ## Langkah 5: S3 Bucket & SNS Topic
 
 1. **S3 Bucket**:
-   - Bucket name (Account Regional): `mbg-uploads-<ACCOUNT_ID>-us-east-1-an`
+   - Bucket name (Account Regional): `mbg-uploads-<ACCOUNT_ID>-us-east-1-an` *(contoh: `mbg-uploads-937385515130-us-east-1-an`)*
    - Region: `us-east-1`
    - **Block all public access**: Centang semua (Aktif).
    - Buat 2 folder/prefix di dalam bucket: `aduan/` dan `laporan/`.
@@ -113,7 +119,8 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
 2. **SNS Topic & Subscription**:
    - Buat Topic bertipe **Standard** dengan nama `mbg-sns-notifikasi`.
    - Buat Subscription: Protocol **Email**, Endpoint: `ukkce2627@smkn1bms.sch.id`.
-   - Pastikan status subscription sudah **Confirmed**. Catat **Topic ARN**.
+   - Pastikan status subscription sudah **Confirmed**.
+   - Catat **Topic ARN** (contoh: `arn:aws:sns:us-east-1:937385515130:mbg-sns-notifikasi`).
 
 ---
 
@@ -141,9 +148,12 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
 
 2. Buka script setup Back End: 👉 **[`scripts/backend.sh`](scripts/backend.sh)**
    - Copy isinya ke **User Data** (atau jalankan via SSM Session Manager).
-   - Ganti variabel `RDS_HOST`, `S3_BUCKET`, dan `SNS_TOPIC_ARN` di bagian paling atas script.
+   - Ganti 3 variabel di bagian paling atas script dengan milikmu:
+     - `RDS_HOST` → contoh: `"mbg-rds-mysql.c1fa8qkqs4ma.us-east-1.rds.amazonaws.com"`
+     - `S3_BUCKET` → contoh: `"mbg-uploads-937385515130-us-east-1-an"`
+     - `SNS_TOPIC_ARN` → contoh: `"arn:aws:sns:us-east-1:937385515130:mbg-sns-notifikasi"`
 
-3. Catat **Private IP** dari `mbg-ec2-be` setelah instance berjalan.
+3. Catat **Private IP** dari `mbg-ec2-be` setelah instance berjalan (contoh: `10.20.10.134`).
 
 ---
 
@@ -156,7 +166,9 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
 
 2. Buka script setup Front End: 👉 **[`scripts/frontend.sh`](scripts/frontend.sh)**
    - Copy isinya ke **User Data** (atau jalankan via SSM Session Manager).
-   - Ganti variabel `EFS_ID` dan `BE_PRIVATE_IP` di bagian paling atas script.
+   - Ganti 2 variabel di bagian paling atas script dengan milikmu:
+     - `EFS_ID` → contoh: `"fs-03504232a17c81d42"`
+     - `BE_PRIVATE_IP` → contoh: `"10.20.10.134"`
 
 3. Setelah `/health.php` merespons OK dan EFS ter-mount, buat **AMI** dari `mbg-ec2-fe-temp` bernama **`mbg-ami-fe`** (tunggu hingga status **Available**).
 
@@ -187,7 +199,7 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
    - Security groups: `mbg-sg-fe`
    - **Resource tags**: Key = `Name`, Value = `mbg-ec2-fe` (Resource type: `Instances`)
    - **Advanced details → IAM instance profile**: `LabInstanceProfile`
-   - **Advanced details → User data**: 👉 **[`scripts/launch-template-userdata.sh`](scripts/launch-template-userdata.sh)** *(ganti `EFS_ID` dengan File System ID kamu)*.
+   - **Advanced details → User data**: 👉 **[`scripts/launch-template-userdata.sh`](scripts/launch-template-userdata.sh)** *(ganti `EFS_ID` contoh `"fs-03504232a17c81d42"` dengan File System ID milikmu)*.
 
 2. **Auto Scaling Group (`mbg-asg-fe`)**:
    - Launch template: `mbg-lt-fe` (Version: **Default / Latest**)
@@ -201,6 +213,6 @@ Buat 5 Security Group di dalam `mbg-vpc` dengan aturan **Inbound Rules** berikut
 ## Langkah 11: Verifikasi Akhir
 
 1. Pastikan kedua instance FE di Target Group `mbg-tg-fe` berstatus **Healthy**.
-2. Akses **DNS Name ALB** di browser.
+2. Akses **DNS Name ALB** di browser (contoh: `http://mbg-alb-fe-1940856405.us-east-1.elb.amazonaws.com`).
 3. Uji login dengan 3 role (`bgn`, `sppg1`, `masy1` — password default: `123`), uji kirim aduan + upload foto (pastikan masuk ke S3 prefix `aduan/`), beri tanggapan sebagai `sppg1`, dan buat laporan (pastikan masuk ke S3 prefix `laporan/`).
 4. Refresh halaman berulang kali untuk memastikan session EFS tidak ter-logout saat traffic berpindah antar instance FE.
